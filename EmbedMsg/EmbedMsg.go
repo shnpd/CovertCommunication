@@ -26,41 +26,17 @@ func main() {
 	}
 	defer client.Shutdown()
 
-	// Source and destination addresses
-	sourceAddress := "SMyjjZCS3Wgn3xidhGs92AFNPxQ1AhuvXk"
-	destinationAddress := "SStEkSyJbAHXdcrfb4GQiLmkS7pEGLDW2Q"
-
-	if err != nil {
-		log.Fatalf("Error decoding source address: %v", err)
-	}
-
-	if err != nil {
-		log.Fatalf("Error decoding destination address: %v", err)
-	}
-
-	// 获取源地址的utxo
-	utxos, err := client.ListUnspentMinMax(1, 9999999)
-	if err != nil {
-		log.Fatalf("Error fetching unspent outputs: %v", err)
-	}
-	var utxosByAddr []btcjson.ListUnspentResult
-	for _, utxo := range utxos {
-		if utxo.Address == sourceAddress {
-			utxosByAddr = append(utxosByAddr, utxo)
-		}
-	}
 	//构造输入
 	var inputs []btcjson.TransactionInput
+	inputs = append(inputs, btcjson.TransactionInput{
+		Txid: "f52b43f10c97280e67c0f2e42631f9bcf621efec2d9ed0c9fe1e0784d02359c1",
+		Vout: 0,
+	})
 	var totalInput btcutil.Amount
-	for _, utxo := range utxosByAddr {
-		inputs = append(inputs, btcjson.TransactionInput{
-			Txid: utxo.TxID,
-			Vout: utxo.Vout,
-		})
-		totalInput += btcutil.Amount(utxos[0].Amount)
-	}
+	totalInput = btcutil.Amount(1)
 
 	//构造输出（输入全部用作输出，没有交易费）
+	destinationAddress := "SStEkSyJbAHXdcrfb4GQiLmkS7pEGLDW2Q"
 	destAddr, _ := btcutil.DecodeAddress(destinationAddress, &chaincfg.SimNetParams)
 	outputs := map[btcutil.Address]btcutil.Amount{
 		destAddr: totalInput,
@@ -68,19 +44,21 @@ func main() {
 
 	// 创建交易
 	rawTx, err := client.CreateRawTransaction(inputs, outputs, nil)
+
 	if err != nil {
 		log.Fatalf("Error creating raw transaction: %v", err)
 	}
 
-	//	签名交易
-	t := "1234"
-	signedTx, complete, err := client.SignRawTransaction(rawTx, &t)
+	//	签名交易(嵌入消息)
+	coverMsg := "hello world!"
+	signedTx, complete, err := client.SignRawTransaction(rawTx, &coverMsg)
 	if err != nil {
 		log.Fatalf("Error signing transaction: %v", err)
 	}
 	if !complete {
 		log.Fatalf("Transaction signing incomplete")
 	}
+
 	//	广播交易
 	txHash, err := client.SendRawTransaction(signedTx, false)
 	if err != nil {
